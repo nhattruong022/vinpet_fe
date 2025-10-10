@@ -1,7 +1,6 @@
     'use client';
 
 import { useState, useRef } from 'react';
-import { apiService } from '@/lib/api';
 
 interface ImageItem {
   url?: string;  // Preview URL (temporary)
@@ -18,9 +17,7 @@ interface ImageUploadProps {
   postId?: string; // Add postId prop
 }
 
-export default function ImageUpload({ onImagesUploaded, currentImages = [], label = "Hình ảnh", multiple = true, postId }: ImageUploadProps) {
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({});
+export default function ImageUpload({ onImagesUploaded, currentImages = [], label = "Hình ảnh", multiple = true }: ImageUploadProps) {
   const [images, setImages] = useState<ImageItem[]>(currentImages);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -190,7 +187,7 @@ export default function ImageUpload({ onImagesUploaded, currentImages = [], labe
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
+                  disabled={false}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   Thêm hình ảnh

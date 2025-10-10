@@ -65,7 +65,7 @@ export interface Post {
   }>;
   schemaData: {
     type: string;
-    data: any;
+    data: Record<string, unknown>;
   };
   createdAt: string;
   updatedAt: string;
@@ -125,7 +125,7 @@ class ApiService {
   }
 
   // Posts methods
-  async getPosts(page: number = 1, limit: number = 10, filters?: any): Promise<PostsResponse> {
+  async getPosts(page: number = 1, limit: number = 10, filters?: Record<string, unknown>): Promise<PostsResponse> {
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
@@ -141,12 +141,12 @@ class ApiService {
     return response.data.data;
   }
 
-  async createPost(postData: any): Promise<Post> {
+  async createPost(postData: Record<string, unknown>): Promise<Post> {
     const response = await axiosInstance.post<ApiResponse<Post>>(API_ENDPOINTS.POSTS.CREATE, postData);
     return response.data.data;
   }
 
-  async updatePost(id: string, postData: any): Promise<Post> {
+  async updatePost(id: string, postData: Record<string, unknown>): Promise<Post> {
     const response = await axiosInstance.put<ApiResponse<Post>>(`${API_ENDPOINTS.POSTS.UPDATE}/${id}`, postData);
     return response.data.data;
   }

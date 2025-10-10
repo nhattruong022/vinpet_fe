@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { apiService } from '@/lib/api';
 import SuccessNotification from '@/components/SuccessNotification';
@@ -46,15 +46,7 @@ export default function EditPost() {
   const [editStep, setEditStep] = useState<'edit' | 'images'>('edit');
   const [isUploadingImages, setIsUploadingImages] = useState(false);
 
-  useEffect(() => {
-    if (!apiService.isAuthenticated()) {
-      router.push('/login');
-      return;
-    }
-    loadPost();
-  }, [router, postId]);
-
-  const loadPost = async () => {
+  const loadPost = useCallback(async () => {
     try {
       const post = await apiService.getPost(postId);
       
@@ -86,7 +78,7 @@ export default function EditPost() {
 
       // Load existing images if any
       if (post.images && post.images.length > 0) {
-        const existingImages = post.images.map((img: any, index: number) => ({
+        const existingImages = post.images.map((img: {url: string, id: string, position: number}, index: number) => ({
           url: img.url,
           id: img.id,
           name: `existing-image-${index}`,
@@ -100,7 +92,15 @@ export default function EditPost() {
     } finally {
       setIsLoadingPost(false);
     }
-  };
+  }, [postId]);
+
+  useEffect(() => {
+    if (!apiService.isAuthenticated()) {
+      router.push('/login');
+      return;
+    }
+    loadPost();
+  }, [router, postId, loadPost]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;

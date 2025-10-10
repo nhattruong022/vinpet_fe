@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiService } from '@/lib/api';
 import SuccessNotification from '@/components/SuccessNotification';
-import SeoPreview from '@/components/SeoPreview';
 import ImageUpload from '@/components/ImageUpload';
 
 export default function CreateEditPost() {
@@ -32,12 +31,6 @@ export default function CreateEditPost() {
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [images, setImages] = useState<Array<{url?: string, id?: string, file: File, name: string}>>([]);
-  const [seoPreview, setSeoPreview] = useState({
-    title: '',
-    url: '',
-    description: '',
-    siteName: 'Vinpet'
-  });
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [createdPostId, setCreatedPostId] = useState<string | null>(null);
   const [uploadStep, setUploadStep] = useState<'create' | 'upload'>('create');

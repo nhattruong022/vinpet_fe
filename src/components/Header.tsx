@@ -8,14 +8,12 @@ import SuccessNotification from './SuccessNotification';
 
 export default function Header() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showLogoutSuccess, setShowLogoutSuccess] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   
 
   const handleLogout = async () => {
-    setIsLoggingOut(true);
     try {
       await apiService.clearAuth();
       
@@ -33,8 +31,6 @@ export default function Header() {
       setTimeout(() => {
         router.push('/login');
       }, 2000);
-    } finally {
-      setIsLoggingOut(false);
     }
   };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { apiService, Post } from '@/lib/api';
 
@@ -8,7 +8,6 @@ export default function PostsManagement() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [filters, setFilters] = useState({
     status: '',
@@ -21,23 +20,22 @@ export default function PostsManagement() {
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
 
   // Load posts from API
-  const loadPosts = async () => {
+  const loadPosts = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await apiService.getPosts(currentPage, 10, filters);
       setPosts(response.posts);
-      setTotalPages(response.totalPages);
       setTotalItems(response.totalItems);
     } catch (error) {
       console.error('Error loading posts:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage, filters]);
 
   useEffect(() => {
     loadPosts();
-  }, [currentPage, filters]);
+  }, [currentPage, filters, loadPosts]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -441,7 +439,7 @@ export default function PostsManagement() {
                     </h3>
                     <div className="mt-2">
                       <p className="text-sm text-gray-500">
-                        Bạn có chắc chắn muốn xóa bài viết "{postToDelete.title}"? Hành động này không thể hoàn tác.
+                        Bạn có chắc chắn muốn xóa bài viết &quot;{postToDelete.title}&quot;? Hành động này không thể hoàn tác.
                       </p>
                     </div>
                   </div>
