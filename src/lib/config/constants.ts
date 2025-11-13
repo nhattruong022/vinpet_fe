@@ -10,6 +10,9 @@ export const API_ENDPOINTS = {
     LOGIN: '/auth/login',
     LOGOUT: '/auth/logout',
   },
+  CATEGORIES: {
+    TREE: '/categories/tree',
+  },
   POSTS: {
     LIST: '/posts',
     CREATE: '/posts',

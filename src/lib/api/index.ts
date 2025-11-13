@@ -109,6 +109,19 @@ interface MediaUploadResponse {
   url?: string;
 }
 
+// Category Tree interface
+export interface CategoryTreeNode {
+  _id: string;
+  slug: string;
+  parent: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  name_vi?: string;
+  name_en?: string;
+  name_ko?: string;
+  children: CategoryTreeNode[];
+}
+
 // API Service Class - Simplified for login and posts
 class ApiService {
   // Authentication methods
@@ -214,6 +227,23 @@ class ApiService {
 
     const responses = await Promise.all(uploadPromises);
     return responses.map(response => response.data.data);
+  }
+
+  async getCategoryTree(params: {
+    rootOnly?: boolean;
+    includeInactive?: boolean;
+  } = {}): Promise<CategoryTreeNode[]> {
+    const response = await axiosInstance.get<ApiResponse<CategoryTreeNode[]>>(
+      API_ENDPOINTS.CATEGORIES.TREE,
+      {
+        params: {
+          rootOnly: params.rootOnly ?? false,
+          includeInactive: params.includeInactive ?? false,
+        },
+      }
+    );
+
+    return response.data.data || [];
   }
 
   // Utility methods for token management

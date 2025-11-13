@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiService } from '@/lib/api';
+import { apiService, CategoryTreeNode } from '@/lib/api';
 
 interface MenuItem {
   id: string;
@@ -10,7 +10,8 @@ interface MenuItem {
   url: string;
   order: number;
   isActive: boolean;
-  parentId?: string;
+  slug?: string;
+  parentId?: string | null;
   children?: MenuItem[];
 }
 
@@ -26,6 +27,7 @@ export default function MenuManagement() {
     order: 0,
     isActive: true,
     parentId: '',
+    slug: '',
   });
 
   useEffect(() => {
@@ -38,61 +40,60 @@ export default function MenuManagement() {
 
   const loadMenuItems = async () => {
     try {
-      // Mock data - replace with actual API call
-      const mockData: MenuItem[] = [
-        {
-          id: '1',
-          title: 'Trang chủ',
-          url: '/',
-          order: 1,
-          isActive: true,
-        },
-        {
-          id: '2',
-          title: 'Về chúng tôi',
-          url: '/about',
-          order: 2,
-          isActive: true,
-        },
-        {
-          id: '3',
-          title: 'Dịch vụ',
-          url: '/services',
-          order: 3,
-          isActive: true,
-          children: [
-            {
-              id: '3-1',
-              title: 'Chăm sóc thú cưng',
-              url: '/services/pet-care',
-              order: 1,
-              isActive: true,
-              parentId: '3',
-            },
-            {
-              id: '3-2',
-              title: 'Spa thú cưng',
-              url: '/services/pet-spa',
-              order: 2,
-              isActive: true,
-              parentId: '3',
-            },
-          ],
-        },
-        {
-          id: '4',
-          title: 'Liên hệ',
-          url: '/contact',
-          order: 4,
-          isActive: true,
-        },
-      ];
-      setMenuItems(mockData);
+      const categoryTree = await apiService.getCategoryTree({
+        rootOnly: false,
+        includeInactive: true,
+      });
+
+      const transformedItems = buildMenuItems(categoryTree);
+      setMenuItems(transformedItems);
     } catch (error) {
       console.error('Error loading menu items:', error);
+      setMenuItems([]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const buildMenuItems = (categories: CategoryTreeNode[]): MenuItem[] => {
+    const sortByOrder = <T extends { sortOrder?: number }>(nodes: T[]) =>
+      [...nodes].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+    const mapCategoryToMenuItem = (
+      category: CategoryTreeNode,
+      parentSlugs: string[] = []
+    ): MenuItem => {
+      const pathSegments = [...parentSlugs, category.slug].filter(Boolean);
+      const url =
+        pathSegments.length > 0 ? `/${pathSegments.join('/')}` : '/';
+
+      const mappedChildren =
+        category.children?.map((child) =>
+          mapCategoryToMenuItem(child, pathSegments)
+        ) ?? [];
+
+      const item: MenuItem = {
+        id: category._id,
+        title: category.name_vi || category.name_en || category.slug,
+        url,
+        order: category.sortOrder ?? 0,
+        isActive: category.isActive,
+        slug: category.slug,
+        parentId: category.parent,
+      };
+
+      if (mappedChildren.length > 0) {
+        item.children = mappedChildren.sort(
+          (a, b) => (a.order ?? 0) - (b.order ?? 0)
+        );
+      }
+
+      return item;
+    };
+
+    return sortByOrder(categories).map((category) =>
+      mapCategoryToMenuItem(category)
+    );
   };
 
   const handleCreate = () => {
@@ -104,6 +105,7 @@ export default function MenuManagement() {
       order: menuItems.length + 1,
       isActive: true,
       parentId: '',
+      slug: '',
     });
   };
 
@@ -116,6 +118,7 @@ export default function MenuManagement() {
       order: item.order,
       isActive: item.isActive,
       parentId: item.parentId || '',
+      slug: item.slug || '',
     });
   };
 
@@ -134,6 +137,7 @@ export default function MenuManagement() {
         const newItem: MenuItem = {
           id: Date.now().toString(),
           ...formData,
+          slug: formData.slug || formData.url.replace(/^\//, ''),
         };
         setMenuItems([...menuItems, newItem]);
       }
@@ -147,6 +151,7 @@ export default function MenuManagement() {
         order: 0,
         isActive: true,
         parentId: '',
+        slug: '',
       });
     } catch (error) {
       console.error('Error saving menu item:', error);
@@ -169,54 +174,92 @@ export default function MenuManagement() {
     setMenuItems(updatedItems);
   };
 
-  const renderMenuItem = (item: MenuItem, level = 0) => (
-    <div key={item.id} className={`${level > 0 ? 'ml-6' : ''}`}>
-      <div className="flex items-center justify-between p-4 bg-white rounded-lg shadow-sm border border-gray-200 mb-2">
-        <div className="flex items-center space-x-4">
-          <div className={`w-3 h-3 rounded-full ${item.isActive ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-          <div>
-            <h3 className="font-medium text-gray-900">{item.title}</h3>
-            <p className="text-sm text-gray-500">{item.url}</p>
-            <p className="text-xs text-gray-400">Thứ tự: {item.order}</p>
+  const renderMenuItem = (item: MenuItem, level = 0) => {
+    const containerClasses = [
+      'flex items-start justify-between rounded-xl transition-all duration-200',
+      'p-4',
+      level === 0
+        ? 'bg-white border border-gray-200 shadow-sm'
+        : 'bg-blue-50 border border-blue-100 shadow-sm shadow-blue-100/40',
+    ].join(' ');
+
+    return (
+      <div key={item.id} className={level === 0 ? '' : 'pl-4'}>
+        <div className={containerClasses}>
+          <div className="flex items-start space-x-4">
+            <div className="flex flex-col items-center pt-1">
+              <div
+                className={`w-2.5 h-2.5 rounded-full mt-0.5 ${
+                  item.isActive ? 'bg-green-500' : 'bg-gray-300'
+                }`}
+              ></div>
+              {item.children && item.children.length > 0 && (
+                <div className="flex-1 w-px bg-gradient-to-b from-green-400/60 to-transparent mt-2"></div>
+              )}
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="font-medium text-gray-900">{item.title}</h3>
+                {level > 0 && (
+                  <span className="px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-blue-600 bg-blue-100 rounded-full">
+                    Submenu cấp {level}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-gray-500">{item.url}</p>
+              <div className="flex items-center space-x-3 mt-1 text-xs text-gray-500">
+                <span>Thứ tự: {item.order}</span>
+                {item.slug && (
+                  <span>
+                    Slug: <span className="font-medium text-gray-700">{item.slug}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => toggleActive(item.id)}
+              className={`px-3 py-1 rounded-full text-xs font-medium ${
+                item.isActive
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-gray-100 text-gray-800'
+              }`}
+            >
+              {item.isActive ? 'Hoạt động' : 'Tạm dừng'}
+            </button>
+            <button
+              onClick={() => handleEdit(item)}
+              className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+              title="Chỉnh sửa"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+            <button
+              onClick={() => handleDelete(item.id)}
+              className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+              title="Xóa"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => toggleActive(item.id)}
-            className={`px-3 py-1 rounded-full text-xs font-medium ${
-              item.isActive 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-gray-100 text-gray-800'
-            }`}
-          >
-            {item.isActive ? 'Hoạt động' : 'Tạm dừng'}
-          </button>
-          <button
-            onClick={() => handleEdit(item)}
-            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-            title="Chỉnh sửa"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-          </button>
-          <button
-            onClick={() => handleDelete(item.id)}
-            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            title="Xóa"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
-        </div>
-      </div>
-      {item.children && item.children.map(child => renderMenuItem(child, level + 1))}
-    </div>
-  );
+        {item.children && item.children.length > 0 && (
+          <div className="ml-4 pl-6 border-l-2 border-dashed border-blue-200 mt-3 space-y-3">
+            {item.children.map((child) => renderMenuItem(child, level + 1))}
+          </div>
+        )}
+      </div>  
+    );
+  };
 
   if (isLoading) {
     return (
+      
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
