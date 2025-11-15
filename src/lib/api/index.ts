@@ -116,9 +116,12 @@ export interface CategoryTreeNode {
   parent: string | null;
   isActive: boolean;
   sortOrder: number;
+  name?: string;
   name_vi?: string;
   name_en?: string;
   name_ko?: string;
+  description?: string;
+  key?: string; // Translation key cho frontend (ví dụ: "about_us")
   children: CategoryTreeNode[];
 }
 
@@ -144,7 +147,7 @@ class ApiService {
       limit: limit.toString(),
       ...filters
     });
-    
+
     const response = await axiosInstance.get<ApiResponse<PostsResponse>>(`${API_ENDPOINTS.POSTS.LIST}?${params}`);
     return response.data.data;
   }
@@ -183,30 +186,30 @@ class ApiService {
   async uploadMedia(file: File, postId?: string, position?: number): Promise<MediaUploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     // Add postId if provided
     if (postId) {
       formData.append('postId', postId);
     }
-    
+
     // Add position if provided
     if (position !== undefined) {
       formData.append('position', position.toString());
     }
-    
+
     const response = await axiosInstance.post<ApiResponse<MediaUploadResponse>>('/media/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
-    
+
     const data = response.data.data;
-    
+
     // Construct URL if not provided by API
     if (!data.url && data.filename) {
       data.url = `/uploads/media/${data.filename}`;
     }
-    
+
     return data;
   }
 
@@ -217,7 +220,7 @@ class ApiService {
       formData.append('file', file);
       formData.append('postId', postId);
       formData.append('position', index.toString());
-      
+
       return axiosInstance.post<ApiResponse<MediaUploadResponse>>('/media/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -246,6 +249,46 @@ class ApiService {
     return response.data.data || [];
   }
 
+  async createCategory(categoryData: {
+    menuName: string;
+    description?: string;
+    status?: 'active' | 'inactive';
+    sortOrder?: number;
+    parent?: string | null;
+    metaTitle?: string;
+    metaDescription?: string;
+    color?: string;
+    icon?: string;
+  }): Promise<CategoryTreeNode> {
+    const response = await axiosInstance.post<ApiResponse<CategoryTreeNode>>(
+      API_ENDPOINTS.CATEGORIES.CREATE,
+      categoryData
+    );
+    return response.data.data;
+  }
+
+  async updateCategory(id: string, categoryData: {
+    menuName?: string;
+    description?: string;
+    status?: 'active' | 'inactive';
+    sortOrder?: number;
+    parent?: string | null;
+    metaTitle?: string;
+    metaDescription?: string;
+    color?: string;
+    icon?: string;
+  }): Promise<CategoryTreeNode> {
+    const response = await axiosInstance.put<ApiResponse<CategoryTreeNode>>(
+      `${API_ENDPOINTS.CATEGORIES.UPDATE}/${id}`,
+      categoryData
+    );
+    return response.data.data;
+  }
+
+  async deleteCategory(id: string): Promise<void> {
+    await axiosInstance.delete(`${API_ENDPOINTS.CATEGORIES.DELETE}/${id}`);
+  }
+
   // Utility methods for token management
   setAuthToken(token: string): void {
     localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
@@ -266,7 +309,7 @@ class ApiService {
   getUser(): User | null {
     const userStr = localStorage.getItem(STORAGE_KEYS.USER_DATA);
     if (!userStr) return null;
-    
+
     try {
       return JSON.parse(userStr);
     } catch {

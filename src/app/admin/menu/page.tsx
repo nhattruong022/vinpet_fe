@@ -19,15 +19,17 @@ export default function MenuManagement() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    title: '',
-    url: '',
-    order: 0,
-    isActive: true,
-    parentId: '',
-    slug: '',
+    menuName: '',
+    description: '',
+    sortOrder: 0,
+    status: 'active' as 'active' | 'inactive',
+    parent: null as string | null,
   });
 
   useEffect(() => {
@@ -40,19 +42,45 @@ export default function MenuManagement() {
 
   const loadMenuItems = async () => {
     try {
-      const categoryTree = await apiService.getCategoryTree({
+      const tree = await apiService.getCategoryTree({
         rootOnly: false,
         includeInactive: true,
       });
 
-      const transformedItems = buildMenuItems(categoryTree);
+      setCategoryTree(tree);
+      const transformedItems = buildMenuItems(tree);
       setMenuItems(transformedItems);
     } catch (error) {
       console.error('Error loading menu items:', error);
       setMenuItems([]);
+      setError('Không thể tải danh sách menu. Vui lòng thử lại.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Helper function to flatten category tree for parent dropdown
+  const flattenCategories = (categories: CategoryTreeNode[], level = 0, excludeId?: string): Array<{ id: string; name: string; level: number }> => {
+    const result: Array<{ id: string; name: string; level: number }> = [];
+    categories.forEach(category => {
+      // Skip the category being edited to avoid circular reference
+      if (excludeId && category._id === excludeId) {
+        return;
+      }
+
+      const prefix = level > 0 ? '└─ ' : '';
+      const indent = '  '.repeat(level);
+      const displayName = category.name_vi || category.name_en || category.slug;
+      result.push({
+        id: category._id,
+        name: `${indent}${prefix}${displayName}`,
+        level,
+      });
+      if (category.children && category.children.length > 0) {
+        result.push(...flattenCategories(category.children, level + 1, excludeId));
+      }
+    });
+    return result;
   };
 
   const buildMenuItems = (categories: CategoryTreeNode[]): MenuItem[] => {
@@ -72,9 +100,17 @@ export default function MenuManagement() {
           mapCategoryToMenuItem(child, pathSegments)
         ) ?? [];
 
+      const categoryAny = category as any;
+      const name = category.name || category.name_vi || category.name_en || category.name_ko || category.slug || '';
+      const key = categoryAny.key || '';
+      // Hiển thị name và key nếu có
+      const displayTitle = key
+        ? `${name} (key: ${key})`
+        : name;
+
       const item: MenuItem = {
         id: category._id,
-        title: category.name_vi || category.name_en || category.slug,
+        title: displayTitle,
         url,
         order: category.sortOrder ?? 0,
         isActive: category.isActive,
@@ -99,79 +135,123 @@ export default function MenuManagement() {
   const handleCreate = () => {
     setIsCreating(true);
     setEditingItem(null);
+    setError(null);
     setFormData({
-      title: '',
-      url: '',
-      order: menuItems.length + 1,
-      isActive: true,
-      parentId: '',
-      slug: '',
+      menuName: '',
+      description: '',
+      sortOrder: menuItems.length + 1,
+      status: 'active',
+      parent: null,
     });
   };
 
   const handleEdit = (item: MenuItem) => {
-    setEditingItem(item);
-    setIsCreating(false);
-    setFormData({
-      title: item.title,
-      url: item.url,
-      order: item.order,
-      isActive: item.isActive,
-      parentId: item.parentId || '',
-      slug: item.slug || '',
-    });
+    // Find the category from tree to get full data
+    const findCategory = (categories: CategoryTreeNode[], id: string): CategoryTreeNode | null => {
+      for (const cat of categories) {
+        if (cat._id === id) return cat;
+        if (cat.children) {
+          const found = findCategory(cat.children, id);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const category = findCategory(categoryTree, item.id);
+    if (category) {
+      setEditingItem(item);
+      setIsCreating(false);
+      setError(null);
+      // API response may have "name" field or name_vi/name_en/name_ko, fallback to slug
+      // API tự động tạo name, name_vi, name_en, name_ko từ menuName
+      // Khi edit, ta load lại name (hoặc name_vi/name_en/name_ko) vào menuName
+      const menuName = category.name || category.name_vi || category.name_en || category.name_ko || category.slug || '';
+      const description = category.description || '';
+      setFormData({
+        menuName,
+        description,
+        sortOrder: category.sortOrder ?? 0,
+        status: category.isActive ? 'active' : 'inactive',
+        parent: category.parent,
+      });
+    }
   };
 
   const handleSave = async () => {
+    // Validation
+    if (!formData.menuName || formData.menuName.trim() === '') {
+      setError('Vui lòng nhập tên menu');
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
     try {
+      const categoryData = {
+        menuName: formData.menuName.trim(),
+        description: formData.description.trim() || undefined,
+        status: formData.status,
+        sortOrder: formData.sortOrder,
+        parent: formData.parent || undefined,
+      };
+
       if (editingItem) {
-        // Update existing item
-        const updatedItems = menuItems.map(item => 
-          item.id === editingItem.id 
-            ? { ...item, ...formData }
-            : item
-        );
-        setMenuItems(updatedItems);
+        // Update existing category
+        await apiService.updateCategory(editingItem.id, categoryData);
       } else {
-        // Create new item
-        const newItem: MenuItem = {
-          id: Date.now().toString(),
-          ...formData,
-          slug: formData.slug || formData.url.replace(/^\//, ''),
-        };
-        setMenuItems([...menuItems, newItem]);
+        // Create new category
+        await apiService.createCategory(categoryData);
       }
-      
+
+      // Reload menu items after save
+      await loadMenuItems();
+
       // Reset form
       setIsCreating(false);
       setEditingItem(null);
       setFormData({
-        title: '',
-        url: '',
-        order: 0,
-        isActive: true,
-        parentId: '',
-        slug: '',
+        menuName: '',
+        description: '',
+        sortOrder: 0,
+        status: 'active',
+        parent: null,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving menu item:', error);
+      setError(error.response?.data?.message || 'Có lỗi xảy ra khi lưu menu item. Vui lòng thử lại.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
     if (confirm('Bạn có chắc chắn muốn xóa menu item này?')) {
-      const updatedItems = menuItems.filter(item => item.id !== id);
-      setMenuItems(updatedItems);
+      try {
+        await apiService.deleteCategory(id);
+        await loadMenuItems();
+      } catch (error: any) {
+        console.error('Error deleting menu item:', error);
+        setError(error.response?.data?.message || 'Có lỗi xảy ra khi xóa menu item. Vui lòng thử lại.');
+      }
     }
   };
 
   const toggleActive = async (id: string) => {
-    const updatedItems = menuItems.map(item => 
-      item.id === id 
-        ? { ...item, isActive: !item.isActive }
-        : item
-    );
-    setMenuItems(updatedItems);
+    const item = menuItems.find(m => m.id === id);
+    if (!item) return;
+
+    try {
+      const newStatus = item.isActive ? 'inactive' : 'active';
+      await apiService.updateCategory(id, {
+        status: newStatus,
+      });
+      await loadMenuItems();
+    } catch (error: any) {
+      console.error('Error toggling active status:', error);
+      setError(error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật trạng thái. Vui lòng thử lại.');
+    }
   };
 
   const renderMenuItem = (item: MenuItem, level = 0) => {
@@ -189,9 +269,8 @@ export default function MenuManagement() {
           <div className="flex items-start space-x-4">
             <div className="flex flex-col items-center pt-1">
               <div
-                className={`w-2.5 h-2.5 rounded-full mt-0.5 ${
-                  item.isActive ? 'bg-green-500' : 'bg-gray-300'
-                }`}
+                className={`w-2.5 h-2.5 rounded-full mt-0.5 ${item.isActive ? 'bg-green-500' : 'bg-gray-300'
+                  }`}
               ></div>
               {item.children && item.children.length > 0 && (
                 <div className="flex-1 w-px bg-gradient-to-b from-green-400/60 to-transparent mt-2"></div>
@@ -215,16 +294,26 @@ export default function MenuManagement() {
                   </span>
                 )}
               </div>
+              {/* Hiển thị key nếu có */}
+              {item.title.includes('key:') && (() => {
+                const key = item.title.match(/key: ([^)]+)/)?.[1] || '';
+                return (
+                  <div className="mt-1">
+                    <span className="text-xs font-mono text-purple-600 bg-purple-50 px-2 py-1 rounded border border-purple-200">
+                      Key: {key}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
           <div className="flex items-center space-x-2">
             <button
               onClick={() => toggleActive(item.id)}
-              className={`px-3 py-1 rounded-full text-xs font-medium ${
-                item.isActive
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-gray-100 text-gray-800'
-              }`}
+              className={`px-3 py-1 rounded-full text-xs font-medium ${item.isActive
+                ? 'bg-green-100 text-green-800'
+                : 'bg-gray-100 text-gray-800'
+                }`}
             >
               {item.isActive ? 'Hoạt động' : 'Tạm dừng'}
             </button>
@@ -253,13 +342,13 @@ export default function MenuManagement() {
             {item.children.map((child) => renderMenuItem(child, level + 1))}
           </div>
         )}
-      </div>  
+      </div>
     );
   };
 
   if (isLoading) {
     return (
-      
+
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
@@ -308,83 +397,123 @@ export default function MenuManagement() {
           )}
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-800 text-sm">{error}</p>
+          </div>
+        )}
+
         {/* Create/Edit Form Modal */}
         {(isCreating || editingItem) && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
                 {editingItem ? 'Chỉnh sửa Menu Item' : 'Thêm Menu Item Mới'}
               </h3>
-              
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-800 text-sm">{error}</p>
+                </div>
+              )}
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tiêu đề
+                    Tên menu <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    value={formData.menuName}
+                    onChange={(e) => setFormData({ ...formData, menuName: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Nhập tiêu đề menu"
+                    placeholder="Nhập tên menu"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    URL
+                    Mô tả
                   </label>
-                  <input
-                    type="text"
-                    value={formData.url}
-                    onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Nhập URL"
+                    placeholder="Nhập mô tả menu"
+                    rows={3}
                   />
                 </div>
-                
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Danh mục cha
+                  </label>
+                  <select
+                    value={formData.parent || ''}
+                    onChange={(e) => setFormData({ ...formData, parent: e.target.value || null })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Không có (Root category - Menu cấp 1) --</option>
+                    {flattenCategories(categoryTree, 0, editingItem?.id).map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    💡 Chọn danh mục cha để tạo submenu. Để trống nếu đây là menu cấp 1.
+                  </p>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Thứ tự
                   </label>
                   <input
                     type="number"
-                    value={formData.order}
-                    onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
+                    value={formData.sortOrder}
+                    onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Nhập thứ tự"
                   />
                 </div>
-                
+
                 <div className="flex items-center">
                   <input
                     type="checkbox"
-                    id="isActive"
-                    checked={formData.isActive}
-                    onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                    id="status"
+                    checked={formData.status === 'active'}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.checked ? 'active' : 'inactive' })}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
-                  <label htmlFor="isActive" className="ml-2 text-sm text-gray-700">
+                  <label htmlFor="status" className="ml-2 text-sm text-gray-700">
                     Hoạt động
                   </label>
                 </div>
               </div>
-              
+
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   onClick={() => {
                     setIsCreating(false);
                     setEditingItem(null);
+                    setError(null);
                   }}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  disabled={isSaving}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
                 >
                   Hủy
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  disabled={isSaving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
                 >
-                  {editingItem ? 'Cập nhật' : 'Tạo mới'}
+                  {isSaving && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  )}
+                  <span>{editingItem ? 'Cập nhật' : 'Tạo mới'}</span>
                 </button>
               </div>
             </div>

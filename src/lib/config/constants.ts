@@ -12,6 +12,9 @@ export const API_ENDPOINTS = {
   },
   CATEGORIES: {
     TREE: '/categories/tree',
+    CREATE: '/categories',
+    UPDATE: '/categories',
+    DELETE: '/categories',
   },
   POSTS: {
     LIST: '/posts',
