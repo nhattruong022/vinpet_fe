@@ -59,9 +59,11 @@ export interface Post {
   }>;
   tags: string[];
   images?: Array<{
-    url: string;
+    url?: string;
+    image?: string; // Base64 image data
     id: string;
     position: number;
+    postId?: string;
   }>;
   schemaData: {
     type: string;
@@ -159,26 +161,55 @@ class ApiService {
 
   async getPost(id: string): Promise<Post> {
     const response = await axiosInstance.get<ApiResponse<Post>>(`${API_ENDPOINTS.POSTS.LIST}/${id}`);
-    if (!response.data.data) {
+    const result = response.data.result || response.data.data;
+    if (!result) {
       throw new Error('Invalid response: data is missing');
     }
-    return response.data.data;
+    return result;
+  }
+
+  // Get post by slug
+  async getPostBySlug(slug: string): Promise<Post> {
+    const response = await axiosInstance.get<ApiResponse<Post>>(`${API_ENDPOINTS.POSTS.LIST}/slug/${slug}`);
+    const result = response.data.result || response.data.data;
+    if (!result) {
+      throw new Error('Invalid response: data is missing');
+    }
+    return result;
+  }
+
+  // Get posts by category slug
+  async getPostsByCategory(categorySlug: string, page: number = 1, limit: number = 10): Promise<PostsResponse> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      category: categorySlug,
+    });
+    
+    const response = await axiosInstance.get<ApiResponse<PostsResponse>>(`${API_ENDPOINTS.POSTS.LIST}?${params}`);
+    const result = response.data.result || response.data.data;
+    if (!result) {
+      throw new Error('Invalid response: data is missing');
+    }
+    return result;
   }
 
   async createPost(postData: Record<string, unknown>): Promise<Post> {
     const response = await axiosInstance.post<ApiResponse<Post>>(API_ENDPOINTS.POSTS.CREATE, postData);
-    if (!response.data.data) {
+    const result = response.data.result || response.data.data;
+    if (!result) {
       throw new Error('Invalid response: data is missing');
     }
-    return response.data.data;
+    return result;
   }
 
   async updatePost(id: string, postData: Record<string, unknown>): Promise<Post> {
     const response = await axiosInstance.put<ApiResponse<Post>>(`${API_ENDPOINTS.POSTS.UPDATE}/${id}`, postData);
-    if (!response.data.data) {
+    const result = response.data.result || response.data.data;
+    if (!result) {
       throw new Error('Invalid response: data is missing');
     }
-    return response.data.data;
+    return result;
   }
 
   async deletePost(id: string): Promise<void> {
@@ -220,7 +251,7 @@ class ApiService {
       },
     });
     
-    const data = response.data.data;
+    const data = response.data.result || response.data.data;
     if (!data) {
       throw new Error('Invalid response: data is missing');
     }
@@ -250,10 +281,11 @@ class ApiService {
 
     const responses = await Promise.all(uploadPromises);
     return responses.map(response => {
-      if (!response.data.data) {
+      const data = response.data.result || response.data.data;
+      if (!data) {
         throw new Error('Invalid response: data is missing');
       }
-      return response.data.data;
+      return data;
     });
   }
 

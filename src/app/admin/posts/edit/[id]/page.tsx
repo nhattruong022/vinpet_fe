@@ -17,7 +17,6 @@ export default function EditPost() {
     content: '',
     excerpt: '',
     status: 'draft' as 'published' | 'draft',
-    tags: '',
     seoTitle: '',
     permalink: '',
     metaDescription: '',
@@ -50,15 +49,11 @@ export default function EditPost() {
     try {
       const post = await apiService.getPost(postId);
       
-      // Convert tags array to string
-      const tagsString = post.tags.join(', ');
-      
       setFormData({
         title: post.title,
         content: post.content,
         excerpt: post.excerpt,
         status: post.status,
-        tags: tagsString,
         seoTitle: post.seoTitle,
         permalink: post.permalink,
         metaDescription: post.metaDescription,
@@ -78,8 +73,8 @@ export default function EditPost() {
 
       // Load existing images if any
       if (post.images && post.images.length > 0) {
-        const existingImages = post.images.map((img: {url: string, id: string, position: number}, index: number) => ({
-          url: img.url,
+        const existingImages = post.images.map((img, index: number) => ({
+          url: img.url || img.image || '', // Use url or image (base64) or empty string
           id: img.id,
           name: `existing-image-${index}`,
           file: new File([], `existing-image-${index}`) // Placeholder file
@@ -227,14 +222,11 @@ export default function EditPost() {
     setIsLoading(true);
     
     try {
-      // Convert tags string to array
-      const tagsArray = formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
-      
       const postData = {
         ...formData,
-        tags: tagsArray,
+        tags: [],
         author: '68cc1c99d4b84384037ccd1b', // Current user ID
-        categories: ['68dcf18e8f673df9f2a5dab7'], // Default category
+        // Keep existing categories from post
       };
       
       console.log('Update post data:', postData);
@@ -380,23 +372,6 @@ export default function EditPost() {
                 {errors.content && (
                   <p className="mt-1 text-sm text-red-600">{errors.content}</p>
                 )}
-              </div>
-
-              {/* Tags */}
-              <div>
-                <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-2">
-                  Tags
-                </label>
-                <input
-                  type="text"
-                  id="tags"
-                  name="tags"
-                  value={formData.tags}
-                  onChange={handleInputChange}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
-                  placeholder="Nhập tags, phân cách bằng dấu phẩy (ví dụ: chó, thú cưng, nuôi dạy)"
-                />
-                <p className="mt-1 text-sm text-gray-500">Phân cách các tags bằng dấu phẩy</p>
               </div>
 
               {/* Status */}

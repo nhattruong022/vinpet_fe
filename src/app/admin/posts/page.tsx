@@ -258,9 +258,6 @@ export default function PostsManagement() {
                   Danh mục
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Thẻ
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Thời gian
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -274,7 +271,7 @@ export default function PostsManagement() {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                       <span className="ml-2 text-gray-600">Đang tải...</span>
@@ -283,7 +280,7 @@ export default function PostsManagement() {
                 </tr>
               ) : posts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="text-gray-500">
                       <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -301,9 +298,12 @@ export default function PostsManagement() {
                       <div className="flex items-center">
                         <input type="checkbox" className="mr-3 rounded border-gray-300" />
                         <div>
-                          <div className="text-sm font-medium text-gray-900 max-w-xs truncate">
+                          <Link
+                            href={`/admin/posts/${post._id}`}
+                            className="text-sm font-medium text-blue-600 hover:text-blue-800 max-w-xs truncate block"
+                          >
                             {post.title}
-                          </div>
+                          </Link>
                           {post.excerpt && (
                             <div className="text-xs text-gray-500 mt-1 max-w-xs truncate">
                               {post.excerpt}
@@ -328,16 +328,6 @@ export default function PostsManagement() {
                       <div className="text-sm text-gray-900">
                         {post.categories && post.categories.length > 0 
                           ? post.categories.map(cat => cat.name).join(', ')
-                          : '-'
-                        }
-                      </div>
-                    </td>
-
-                    {/* Thẻ */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {post.tags && post.tags.length > 0 
-                          ? post.tags.slice(0, 2).join(', ') + (post.tags.length > 2 ? '...' : '')
                           : '-'
                         }
                       </div>

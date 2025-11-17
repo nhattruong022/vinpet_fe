@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiService } from '@/lib/api';
+import { apiService, CategoryTreeNode } from '@/lib/api';
 import SuccessNotification from '@/components/SuccessNotification';
 import ImageUpload from '@/components/ImageUpload';
 
@@ -13,13 +13,13 @@ export default function CreateEditPost() {
     content: '',
     excerpt: '',
     status: 'draft' as 'published' | 'draft',
-    tags: '',
     seoTitle: '',
     permalink: '',
     metaDescription: '',
     featuredImageUrl: '',
     canonicalUrl: '',
     breadcrumbTitle: '',
+    categoryId: '',
     robotsMeta: {
       index: true,
       nofollow: false,
@@ -35,6 +35,43 @@ export default function CreateEditPost() {
   const [createdPostId, setCreatedPostId] = useState<string | null>(null);
   const [uploadStep, setUploadStep] = useState<'create' | 'upload'>('create');
   const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [categories, setCategories] = useState<CategoryTreeNode[]>([]);
+
+  // Load categories on mount
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    try {
+      const tree = await apiService.getCategoryTree({
+        rootOnly: false,
+        includeInactive: false,
+      });
+      setCategories(tree);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
+
+  // Flatten categories for dropdown
+  const flattenCategories = (categories: CategoryTreeNode[], level = 0): Array<{ id: string; name: string; level: number }> => {
+    const result: Array<{ id: string; name: string; level: number }> = [];
+    categories.forEach(category => {
+      const indent = '  '.repeat(level);
+      const prefix = level > 0 ? '└─ ' : '';
+      const displayName = category.name || category.name_vi || category.name_en || category.slug || 'Unnamed';
+      result.push({
+        id: category._id,
+        name: `${indent}${prefix}${displayName}`,
+        level,
+      });
+      if (category.children && category.children.length > 0) {
+        result.push(...flattenCategories(category.children, level + 1));
+      }
+    });
+    return result;
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -155,14 +192,11 @@ export default function CreateEditPost() {
     setIsLoading(true);
     
     try {
-      // Convert tags string to array
-      const tagsArray = formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
-      
       const postData = {
         ...formData,
-        tags: tagsArray,
+        tags: [],
         author: '68cc1c99d4b84384037ccd1b', // Current user ID
-        categories: ['68dcf18e8f673df9f2a5dab7'], // Default category
+        categories: formData.categoryId ? [formData.categoryId] : [],
         // Remove images from initial post creation
       };
       
@@ -303,21 +337,28 @@ export default function CreateEditPost() {
                 )}
               </div>
 
-              {/* Tags */}
+              {/* Category */}
               <div>
-                <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-2">
-                  Tags
+                <label htmlFor="categoryId" className="block text-sm font-medium text-gray-700 mb-2">
+                  Danh mục (Menu)
                 </label>
-                <input
-                  type="text"
-                  id="tags"
-                  name="tags"
-                  value={formData.tags}
+                <select
+                  id="categoryId"
+                  name="categoryId"
+                  value={formData.categoryId}
                   onChange={handleInputChange}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
-                  placeholder="Nhập tags, phân cách bằng dấu phẩy (ví dụ: chó, thú cưng, nuôi dạy)"
-                />
-                <p className="mt-1 text-sm text-gray-500">Phân cách các tags bằng dấu phẩy</p>
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
+                >
+                  <option value="">-- Chọn danh mục --</option>
+                  {flattenCategories(categories).map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  💡 Chọn danh mục để bài viết hiển thị khi user click vào menu tương ứng
+                </p>
               </div>
 
               {/* Status */}
