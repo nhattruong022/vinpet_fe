@@ -400,8 +400,8 @@ export default function MenuManagement() {
 
         {/* Create/Edit Form Modal */}
         {(isCreating || editingItem) && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto shadow-2xl pointer-events-auto">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
                 {editingItem ? 'Chỉnh sửa Menu Item' : 'Thêm Menu Item Mới'}
               </h3>
