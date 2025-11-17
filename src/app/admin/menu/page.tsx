@@ -11,6 +11,7 @@ interface MenuItem {
   order: number;
   isActive: boolean;
   slug?: string;
+  key?: string;
   parentId?: string | null;
   children?: MenuItem[];
 }
@@ -70,7 +71,8 @@ export default function MenuManagement() {
 
       const prefix = level > 0 ? '└─ ' : '';
       const indent = '  '.repeat(level);
-      const displayName = category.name_vi || category.name_en || category.slug;
+      // Use 'name' field (new format) or fallback to old format
+      const displayName = category.name || category.name_vi || category.name_en || category.slug || 'Unnamed';
       result.push({
         id: category._id,
         name: `${indent}${prefix}${displayName}`,
@@ -100,22 +102,19 @@ export default function MenuManagement() {
           mapCategoryToMenuItem(child, pathSegments)
         ) ?? [];
 
-      const categoryAny = category as any;
+      // Use 'name' field (new format) or fallback to old format
       const name = category.name || category.name_vi || category.name_en || category.name_ko || category.slug || '';
-      const key = categoryAny.key || '';
-      // Hiển thị name và key nếu có
-      const displayTitle = key
-        ? `${name} (key: ${key})`
-        : name;
+      const key = category.key || '';
 
       const item: MenuItem = {
         id: category._id,
-        title: displayTitle,
+        title: name,
         url,
         order: category.sortOrder ?? 0,
         isActive: category.isActive,
         slug: category.slug,
         parentId: category.parent,
+        key: key, // Store key separately for display
       };
 
       if (mappedChildren.length > 0) {
@@ -163,9 +162,7 @@ export default function MenuManagement() {
       setEditingItem(item);
       setIsCreating(false);
       setError(null);
-      // API response may have "name" field or name_vi/name_en/name_ko, fallback to slug
-      // API tự động tạo name, name_vi, name_en, name_ko từ menuName
-      // Khi edit, ta load lại name (hoặc name_vi/name_en/name_ko) vào menuName
+      // Use 'name' field (new format) or fallback to old format
       const menuName = category.name || category.name_vi || category.name_en || category.name_ko || category.slug || '';
       const description = category.description || '';
       setFormData({
@@ -295,16 +292,13 @@ export default function MenuManagement() {
                 )}
               </div>
               {/* Hiển thị key nếu có */}
-              {item.title.includes('key:') && (() => {
-                const key = item.title.match(/key: ([^)]+)/)?.[1] || '';
-                return (
-                  <div className="mt-1">
-                    <span className="text-xs font-mono text-purple-600 bg-purple-50 px-2 py-1 rounded border border-purple-200">
-                      Key: {key}
-                    </span>
-                  </div>
-                );
-              })()}
+              {item.key && (
+                <div className="mt-1">
+                  <span className="text-xs font-mono text-purple-600 bg-purple-50 px-2 py-1 rounded border border-purple-200">
+                    Key: {item.key}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center space-x-2">

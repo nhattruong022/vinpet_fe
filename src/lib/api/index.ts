@@ -75,7 +75,9 @@ export interface Post {
 interface ApiResponse<T> {
   success: boolean;
   message: string;
-  data: T;
+  data?: T;
+  result?: T; // Some APIs use 'result' instead of 'data'
+  returnCode?: number;
 }
 
 // Posts Response interface
@@ -147,23 +149,35 @@ class ApiService {
       limit: limit.toString(),
       ...filters
     });
-
+    
     const response = await axiosInstance.get<ApiResponse<PostsResponse>>(`${API_ENDPOINTS.POSTS.LIST}?${params}`);
+    if (!response.data.data) {
+      throw new Error('Invalid response: data is missing');
+    }
     return response.data.data;
   }
 
   async getPost(id: string): Promise<Post> {
     const response = await axiosInstance.get<ApiResponse<Post>>(`${API_ENDPOINTS.POSTS.LIST}/${id}`);
+    if (!response.data.data) {
+      throw new Error('Invalid response: data is missing');
+    }
     return response.data.data;
   }
 
   async createPost(postData: Record<string, unknown>): Promise<Post> {
     const response = await axiosInstance.post<ApiResponse<Post>>(API_ENDPOINTS.POSTS.CREATE, postData);
+    if (!response.data.data) {
+      throw new Error('Invalid response: data is missing');
+    }
     return response.data.data;
   }
 
   async updatePost(id: string, postData: Record<string, unknown>): Promise<Post> {
     const response = await axiosInstance.put<ApiResponse<Post>>(`${API_ENDPOINTS.POSTS.UPDATE}/${id}`, postData);
+    if (!response.data.data) {
+      throw new Error('Invalid response: data is missing');
+    }
     return response.data.data;
   }
 
@@ -179,6 +193,9 @@ class ApiService {
     siteName: string;
   }): Promise<SeoPreview> {
     const response = await axiosInstance.post<ApiResponse<SeoPreview>>('/api/posts/seo-preview', data);
+    if (!response.data.data) {
+      throw new Error('Invalid response: data is missing');
+    }
     return response.data.data;
   }
 
@@ -202,14 +219,17 @@ class ApiService {
         'Content-Type': 'multipart/form-data',
       },
     });
-
+    
     const data = response.data.data;
-
+    if (!data) {
+      throw new Error('Invalid response: data is missing');
+    }
+    
     // Construct URL if not provided by API
     if (!data.url && data.filename) {
       data.url = `/uploads/media/${data.filename}`;
     }
-
+    
     return data;
   }
 
@@ -229,7 +249,12 @@ class ApiService {
     });
 
     const responses = await Promise.all(uploadPromises);
-    return responses.map(response => response.data.data);
+    return responses.map(response => {
+      if (!response.data.data) {
+        throw new Error('Invalid response: data is missing');
+      }
+      return response.data.data;
+    });
   }
 
   async getCategoryTree(params: {
@@ -246,7 +271,8 @@ class ApiService {
       }
     );
 
-    return response.data.data || [];
+    // Support both 'result' and 'data' fields
+    return response.data.result || response.data.data || [];
   }
 
   async createCategory(categoryData: {
@@ -264,7 +290,11 @@ class ApiService {
       API_ENDPOINTS.CATEGORIES.CREATE,
       categoryData
     );
-    return response.data.data;
+    const result = response.data.result || response.data.data;
+    if (!result) {
+      throw new Error('Invalid response: data is missing');
+    }
+    return result;
   }
 
   async updateCategory(id: string, categoryData: {
@@ -282,7 +312,11 @@ class ApiService {
       `${API_ENDPOINTS.CATEGORIES.UPDATE}/${id}`,
       categoryData
     );
-    return response.data.data;
+    const result = response.data.result || response.data.data;
+    if (!result) {
+      throw new Error('Invalid response: data is missing');
+    }
+    return result;
   }
 
   async deleteCategory(id: string): Promise<void> {
