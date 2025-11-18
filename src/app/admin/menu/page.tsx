@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiService, CategoryTreeNode } from '@/lib/api';
+import Toast from '@/components/Toast';
 
 interface MenuItem {
   id: string;
@@ -25,6 +26,19 @@ export default function MenuManagement() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [menuItemToDelete, setMenuItemToDelete] = useState<MenuItem | null>(null);
+  const [toast, setToast] = useState<{
+    isVisible: boolean;
+    type: 'success' | 'error';
+    title: string;
+    message: string;
+  }>({
+    isVisible: false,
+    type: 'success',
+    title: '',
+    message: '',
+  });
   const [formData, setFormData] = useState({
     menuName: '',
     description: '',
@@ -197,9 +211,21 @@ export default function MenuManagement() {
       if (editingItem) {
         // Update existing category
         await apiService.updateCategory(editingItem.id, categoryData);
+        setToast({
+          isVisible: true,
+          type: 'success',
+          title: 'Cập nhật thành công!',
+          message: `Menu item "${formData.menuName}" đã được cập nhật thành công.`,
+        });
       } else {
         // Create new category
         await apiService.createCategory(categoryData);
+        setToast({
+          isVisible: true,
+          type: 'success',
+          title: 'Tạo mới thành công!',
+          message: `Menu item "${formData.menuName}" đã được tạo thành công.`,
+        });
       }
 
       // Reload menu items after save
@@ -217,21 +243,50 @@ export default function MenuManagement() {
       });
     } catch (error: any) {
       console.error('Error saving menu item:', error);
-      setError(error.response?.data?.message || 'Có lỗi xảy ra khi lưu menu item. Vui lòng thử lại.');
+      const errorMessage = error.response?.data?.message || 'Có lỗi xảy ra khi lưu menu item. Vui lòng thử lại.';
+      setError(errorMessage);
+      setToast({
+        isVisible: true,
+        type: 'error',
+        title: 'Lỗi!',
+        message: errorMessage,
+      });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Bạn có chắc chắn muốn xóa menu item này?')) {
-      try {
-        await apiService.deleteCategory(id);
-        await loadMenuItems();
-      } catch (error: any) {
-        console.error('Error deleting menu item:', error);
-        setError(error.response?.data?.message || 'Có lỗi xảy ra khi xóa menu item. Vui lòng thử lại.');
-      }
+  const handleDelete = (item: MenuItem) => {
+    setMenuItemToDelete(item);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!menuItemToDelete) return;
+    
+    try {
+      await apiService.deleteCategory(menuItemToDelete.id);
+      await loadMenuItems();
+      setShowDeleteModal(false);
+      setMenuItemToDelete(null);
+      setToast({
+        isVisible: true,
+        type: 'success',
+        title: 'Xóa thành công!',
+        message: `Menu item "${menuItemToDelete.title}" đã được xóa thành công.`,
+      });
+    } catch (error: any) {
+      console.error('Error deleting menu item:', error);
+      const errorMessage = error.response?.data?.message || 'Có lỗi xảy ra khi xóa menu item. Vui lòng thử lại.';
+      setError(errorMessage);
+      setToast({
+        isVisible: true,
+        type: 'error',
+        title: 'Lỗi!',
+        message: errorMessage,
+      });
+      setShowDeleteModal(false);
+      setMenuItemToDelete(null);
     }
   };
 
@@ -245,9 +300,22 @@ export default function MenuManagement() {
         status: newStatus,
       });
       await loadMenuItems();
+      setToast({
+        isVisible: true,
+        type: 'success',
+        title: 'Cập nhật thành công!',
+        message: `Trạng thái menu item "${item.title}" đã được cập nhật thành ${newStatus === 'active' ? 'Hoạt động' : 'Tạm dừng'}.`,
+      });
     } catch (error: any) {
       console.error('Error toggling active status:', error);
-      setError(error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật trạng thái. Vui lòng thử lại.');
+      const errorMessage = error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật trạng thái. Vui lòng thử lại.';
+      setError(errorMessage);
+      setToast({
+        isVisible: true,
+        type: 'error',
+        title: 'Lỗi!',
+        message: errorMessage,
+      });
     }
   };
 
@@ -321,7 +389,7 @@ export default function MenuManagement() {
               </svg>
             </button>
             <button
-              onClick={() => handleDelete(item.id)}
+              onClick={() => handleDelete(item)}
               className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
               title="Xóa"
             >
@@ -514,6 +582,63 @@ export default function MenuManagement() {
             </div>
           </div>
         )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && menuItemToDelete && (
+          <div className="fixed inset-0 z-50 overflow-y-auto pointer-events-none">
+            <div className="flex items-center justify-center min-h-screen p-4">
+              <div className="bg-white rounded-lg text-left overflow-hidden shadow-2xl transform transition-all max-w-lg w-full pointer-events-auto">
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900">
+                        Xóa menu item
+                      </h3>
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">
+                          Bạn có chắc chắn muốn xóa menu item &quot;{menuItemToDelete.title}&quot;? Hành động này không thể hoàn tác.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    onClick={confirmDelete}
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Xóa
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowDeleteModal(false);
+                      setMenuItemToDelete(null);
+                    }}
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Hủy
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Toast Notification */}
+        <Toast
+          isVisible={toast.isVisible}
+          type={toast.type}
+          title={toast.title}
+          message={toast.message}
+          onClose={() => setToast({ ...toast, isVisible: false })}
+          autoClose={true}
+          autoCloseDelay={3000}
+        />
       </div>
     </div>
   );

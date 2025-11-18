@@ -245,25 +245,28 @@ export default function PostsManagement() {
       {/* Posts Table */}
       <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="min-w-full divide-y divide-gray-200" style={{ minWidth: '1000px' }}>
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                  Hình ảnh
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-64">
                   Tiêu đề
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                   Tác giả
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-36">
                   Danh mục
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-36">
                   Thời gian
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
                   Chi tiết SEO
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                   Thao tác
                 </th>
               </tr>
@@ -271,7 +274,7 @@ export default function PostsManagement() {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
+                  <td colSpan={7} className="px-6 py-12 text-center">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                       <span className="ml-2 text-gray-600">Đang tải...</span>
@@ -280,7 +283,7 @@ export default function PostsManagement() {
                 </tr>
               ) : posts.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
+                  <td colSpan={7} className="px-6 py-12 text-center">
                     <div className="text-gray-500">
                       <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -291,21 +294,93 @@ export default function PostsManagement() {
                   </td>
                 </tr>
               ) : (
-                posts.map((post) => (
+                posts.map((post) => {
+                  // Get thumbnail URL - lấy image có position=0
+                  const getThumbnailUrl = () => {
+                    // Bước 1: Tìm image có position=0 trong images array
+                    if (post.images && post.images.length > 0) {
+                      const thumbnailImage = post.images.find(img => img.position === 0);
+                      if (thumbnailImage) {
+                        // Ưu tiên dùng image (base64) nếu có
+                        if (thumbnailImage.image) {
+                          return thumbnailImage.image;
+                        }
+                        // Nếu không có base64, dùng url
+                        if (thumbnailImage.url) {
+                          if (thumbnailImage.url.startsWith('http') || thumbnailImage.url.startsWith('data:')) {
+                            return thumbnailImage.url;
+                          }
+                          return `http://localhost:8080${thumbnailImage.url}`;
+                        }
+                      }
+                    }
+                    
+                    // Bước 2: Fallback - dùng featuredImageUrl nếu có (trừ blob URL)
+                    if (post.featuredImageUrl) {
+                      if (!post.featuredImageUrl.startsWith('blob:')) {
+                        if (post.featuredImageUrl.startsWith('http') || post.featuredImageUrl.startsWith('data:')) {
+                          return post.featuredImageUrl;
+                        }
+                        return `http://localhost:8080${post.featuredImageUrl}`;
+                      }
+                    }
+                    
+                    // Bước 3: Fallback cuối cùng - lấy image đầu tiên trong images array
+                    if (post.images && post.images.length > 0) {
+                      const firstImage = post.images[0];
+                      if (firstImage) {
+                        if (firstImage.image) {
+                          return firstImage.image;
+                        }
+                        if (firstImage.url) {
+                          if (firstImage.url.startsWith('http') || firstImage.url.startsWith('data:')) {
+                            return firstImage.url;
+                          }
+                          return `http://localhost:8080${firstImage.url}`;
+                        }
+                      }
+                    }
+                    
+                    return null;
+                  };
+
+                  const thumbnailUrl = getThumbnailUrl();
+
+                  return (
                   <tr key={post._id} className="hover:bg-gray-50">
+                    {/* Hình ảnh */}
+                    <td className="px-3 py-4 whitespace-nowrap">
+                      {thumbnailUrl ? (
+                        <img
+                          src={thumbnailUrl}
+                          alt={post.title}
+                          className="h-14 w-14 object-cover rounded-lg border border-gray-300"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="h-14 w-14 bg-gray-100 rounded-lg border border-gray-300 flex items-center justify-center">
+                          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      )}
+                    </td>
+
                     {/* Tiêu đề */}
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-4">
                       <div className="flex items-center">
-                        <input type="checkbox" className="mr-3 rounded border-gray-300" />
-                        <div>
+                        <input type="checkbox" className="mr-2 rounded border-gray-300" />
+                        <div className="min-w-0 flex-1">
                           <Link
                             href={`/admin/posts/${post._id}`}
-                            className="text-sm font-medium text-blue-600 hover:text-blue-800 max-w-xs truncate block"
+                            className="text-sm font-medium text-blue-600 hover:text-blue-800 block truncate"
                           >
                             {post.title}
                           </Link>
                           {post.excerpt && (
-                            <div className="text-xs text-gray-500 mt-1 max-w-xs truncate">
+                            <div className="text-xs text-gray-500 mt-1 line-clamp-1">
                               {post.excerpt}
                             </div>
                           )}
@@ -314,8 +389,8 @@ export default function PostsManagement() {
                     </td>
 
                     {/* Tác giả */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                    <td className="px-3 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 truncate max-w-[120px]">
                         {post.author?.firstName && post.author?.lastName 
                           ? `${post.author.firstName} ${post.author.lastName}`
                           : post.author?.email || 'N/A'
@@ -324,8 +399,8 @@ export default function PostsManagement() {
                     </td>
 
                     {/* Danh mục */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                    <td className="px-3 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 truncate max-w-[140px]">
                         {post.categories && post.categories.length > 0 
                           ? post.categories.map(cat => cat.name).join(', ')
                           : '-'
@@ -334,23 +409,23 @@ export default function PostsManagement() {
                     </td>
 
                     {/* Thời gian */}
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 py-4 whitespace-nowrap">
                       <div className="text-sm">
                         <div className="flex items-center mb-1">
                           {getStatusBadge(post.status)}
                         </div>
-                        <div className="text-gray-500">
+                        <div className="text-gray-500 text-xs">
                           {formatDate(post.createdAt)}
                         </div>
                       </div>
                     </td>
 
                     {/* Chi tiết SEO */}
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-4">
                       <div className="text-sm">
                         {/* SEO Score */}
-                        <div className="flex items-center mb-2">
-                          <div className={`px-2 py-1 rounded text-xs font-medium ${
+                        <div className="flex items-center mb-1">
+                          <div className={`px-2 py-0.5 rounded text-xs font-medium ${
                             (post.seoScore || 0) >= 80 ? 'bg-green-100 text-green-800' :
                             (post.seoScore || 0) >= 60 ? 'bg-yellow-100 text-yellow-800' :
                             'bg-red-100 text-red-800'
@@ -359,28 +434,23 @@ export default function PostsManagement() {
                           </div>
                         </div>
                         
-                        {/* Keywords */}
+                        {/* Keywords - rút gọn */}
                         {post.seoTitle && (
-                          <div className="text-xs text-gray-600 mb-1">
-                            <span className="font-medium">Từ khóa:</span> {post.seoTitle.split('|')[0]?.trim()}
+                          <div className="text-xs text-gray-600 mb-0.5 truncate max-w-[180px]">
+                            <span className="font-medium">Từ khóa:</span> <span className="truncate">{post.seoTitle.split('|')[0]?.trim().substring(0, 15)}</span>
                           </div>
                         )}
                         
-                        {/* Schema */}
-                        <div className="text-xs text-gray-600 mb-1">
-                          <span className="font-medium">Schema:</span> {post.schemaData?.type || 'Bài viết'} ({post.schemaData?.type || 'BlogPosting'})
-                        </div>
-                        
-                        {/* Links */}
-                        <div className="text-xs text-gray-600">
-                          <span className="font-medium">Liên kết:</span> 0 | 1 | 0 | 1 | 2
+                        {/* Schema - rút gọn */}
+                        <div className="text-xs text-gray-600 truncate max-w-[180px]">
+                          <span className="font-medium">Schema:</span> {post.schemaData?.type || 'BlogPosting'}
                         </div>
                       </div>
                     </td>
 
                     {/* Thao tác */}
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end space-x-2">
+                    <td className="px-3 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center justify-end space-x-1">
                         <Link
                           href={`/admin/posts/edit/${post._id}`}
                           className="text-indigo-600 hover:text-indigo-900 p-1"
@@ -402,7 +472,8 @@ export default function PostsManagement() {
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
