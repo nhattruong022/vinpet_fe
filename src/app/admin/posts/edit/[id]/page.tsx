@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { apiService } from '@/lib/api';
+import { apiService, CategoryTreeNode } from '@/lib/api';
 import SuccessNotification from '@/components/SuccessNotification';
 import SeoPreview from '@/components/SeoPreview';
 import ImageUpload from '@/components/ImageUpload';
@@ -23,6 +23,7 @@ export default function EditPost() {
     featuredImageUrl: '',
     canonicalUrl: '',
     breadcrumbTitle: '',
+    categoryId: '',
     robotsMeta: {
       index: true,
       nofollow: false,
@@ -31,6 +32,7 @@ export default function EditPost() {
       nosnippet: false
     }
   });
+  const [categories, setCategories] = useState<CategoryTreeNode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isLoadingPost, setIsLoadingPost] = useState(true);
@@ -49,6 +51,9 @@ export default function EditPost() {
     try {
       const post = await apiService.getPost(postId);
       
+      // Get category ID from post categories
+      const categoryId = post.categories && post.categories.length > 0 ? post.categories[0]._id : '';
+      
       setFormData({
         title: post.title,
         content: post.content,
@@ -60,6 +65,7 @@ export default function EditPost() {
         featuredImageUrl: post.featuredImageUrl,
         canonicalUrl: post.canonicalUrl,
         breadcrumbTitle: post.breadcrumbTitle,
+        categoryId: categoryId,
         robotsMeta: post.robotsMeta
       });
 
@@ -94,8 +100,40 @@ export default function EditPost() {
       router.push('/login');
       return;
     }
+    loadCategories();
     loadPost();
   }, [router, postId, loadPost]);
+
+  const loadCategories = async () => {
+    try {
+      const tree = await apiService.getCategoryTree({
+        rootOnly: false,
+        includeInactive: false,
+      });
+      setCategories(tree);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
+
+  // Flatten categories for dropdown
+  const flattenCategories = (categories: CategoryTreeNode[], level = 0): Array<{ id: string; name: string; level: number }> => {
+    const result: Array<{ id: string; name: string; level: number }> = [];
+    categories.forEach(category => {
+      const indent = '  '.repeat(level);
+      const prefix = level > 0 ? '└─ ' : '';
+      const displayName = category.name || category.name_vi || category.name_en || category.slug || 'Unnamed';
+      result.push({
+        id: category._id,
+        name: `${indent}${prefix}${displayName}`,
+        level,
+      });
+      if (category.children && category.children.length > 0) {
+        result.push(...flattenCategories(category.children, level + 1));
+      }
+    });
+    return result;
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -225,8 +263,8 @@ export default function EditPost() {
       const postData = {
         ...formData,
         tags: [],
+        categories: formData.categoryId ? [formData.categoryId] : [],
         author: '68cc1c99d4b84384037ccd1b', // Current user ID
-        // Keep existing categories from post
       };
       
       console.log('Update post data:', postData);
@@ -389,6 +427,30 @@ export default function EditPost() {
                   <option value="draft">Bản nháp</option>
                   <option value="published">Đã xuất bản</option>
                 </select>
+              </div>
+
+              {/* Category */}
+              <div>
+                <label htmlFor="categoryId" className="block text-sm font-medium text-gray-700 mb-2">
+                  Danh mục (Menu)
+                </label>
+                <select
+                  id="categoryId"
+                  name="categoryId"
+                  value={formData.categoryId}
+                  onChange={handleInputChange}
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
+                >
+                  <option value="">-- Chọn danh mục --</option>
+                  {flattenCategories(categories).map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Chọn danh mục để phân loại bài viết
+                </p>
               </div>
             </div>
           </div>
