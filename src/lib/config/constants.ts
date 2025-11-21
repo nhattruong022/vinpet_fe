@@ -22,6 +22,9 @@ export const API_ENDPOINTS = {
     UPDATE: '/posts',
     DELETE: '/posts',
   },
+  CONTACT: {
+    LIST: '/contact',
+  },
 };
 
 // Local Storage Keys

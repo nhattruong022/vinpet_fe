@@ -357,34 +357,48 @@ class ApiService {
 
   // Utility methods for token management
   setAuthToken(token: string): void {
-    localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
-  }
-
-  getAuthToken(): string | null {
-    return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-  }
-
-  removeAuthToken(): void {
-    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-  }
-
-  setUser(user: User): void {
-    localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
-  }
-
-  getUser(): User | null {
-    const userStr = localStorage.getItem(STORAGE_KEYS.USER_DATA);
-    if (!userStr) return null;
-
-    try {
-      return JSON.parse(userStr);
-    } catch {
-      return null;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
     }
   }
 
+  getAuthToken(): string | null {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    }
+    return null;
+  }
+
+  removeAuthToken(): void {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    }
+  }
+
+  setUser(user: User): void {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+    }
+  }
+
+  getUser(): User | null {
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem(STORAGE_KEYS.USER_DATA);
+      if (!userStr) return null;
+
+      try {
+        return JSON.parse(userStr);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
   removeUser(): void {
-    localStorage.removeItem(STORAGE_KEYS.USER_DATA);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEYS.USER_DATA);
+    }
   }
 
   // Check if user is authenticated
