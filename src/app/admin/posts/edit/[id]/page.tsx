@@ -91,14 +91,20 @@ export default function EditPost() {
         canonicalUrl: post.canonicalUrl,
         breadcrumbTitle: post.breadcrumbTitle,
         categoryId: categoryId,
-        robotsMeta: post.robotsMeta
+        robotsMeta: post.robotsMeta || {
+          index: true,
+          nofollow: false,
+          noimageindex: false,
+          noarchive: false,
+          nosnippet: false
+        }
       });
 
       // Set SEO preview
       setSeoPreview({
-        title: post.seoTitle,
-        url: post.permalink,
-        description: post.metaDescription,
+        title: post.seoTitle || '',
+        url: post.permalink || '',
+        description: post.metaDescription || '',
         siteName: 'Vinpet'
       });
 
@@ -168,7 +174,13 @@ export default function EditPost() {
       setFormData(prev => ({
         ...prev,
         robotsMeta: {
-          ...prev.robotsMeta,
+          ...(prev.robotsMeta || {
+            index: true,
+            nofollow: false,
+            noimageindex: false,
+            noarchive: false,
+            nosnippet: false
+          }),
           [robotKey]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
         }
       }));

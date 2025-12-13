@@ -160,7 +160,8 @@ class ApiService {
   }
 
   async getPost(id: string): Promise<Post> {
-    const response = await axiosInstance.get<ApiResponse<Post>>(`${API_ENDPOINTS.POSTS.LIST}/${id}`);
+    // Sử dụng endpoint /admin/post/{id} để lấy đầy đủ dữ liệu đa ngôn ngữ
+    const response = await axiosInstance.get<ApiResponse<Post>>(`/admin/post/${id}`);
     const result = response.data.result || response.data.data;
     if (!result) {
       throw new Error('Invalid response: data is missing');
@@ -170,16 +171,13 @@ class ApiService {
 
   // Get full post data with all multilingual fields (for edit)
   async getPostFull(id: string): Promise<Post> {
-    // Try to get from list endpoint with filter to get full object
-    const response = await axiosInstance.get<ApiResponse<{ posts: Post[] }>>(
-      `${API_ENDPOINTS.POSTS.LIST}?_id=${id}`
-    );
-    const data = response.data.result || response.data.data;
-    if (data && (data as any).posts && (data as any).posts.length > 0) {
-      return (data as any).posts[0];
+    // Sử dụng endpoint /admin/post/{id} để lấy đầy đủ dữ liệu đa ngôn ngữ
+    const response = await axiosInstance.get<ApiResponse<Post>>(`/admin/post/${id}`);
+    const result = response.data.result || response.data.data;
+    if (!result) {
+      throw new Error('Invalid response: data is missing');
     }
-    // Fallback to regular getPost
-    return this.getPost(id);
+    return result;
   }
 
   // Get post by slug
