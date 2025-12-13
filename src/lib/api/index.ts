@@ -151,7 +151,7 @@ class ApiService {
       limit: limit.toString(),
       ...filters
     });
-    
+
     const response = await axiosInstance.get<ApiResponse<PostsResponse>>(`${API_ENDPOINTS.POSTS.LIST}?${params}`);
     if (!response.data.data) {
       throw new Error('Invalid response: data is missing');
@@ -166,6 +166,20 @@ class ApiService {
       throw new Error('Invalid response: data is missing');
     }
     return result;
+  }
+
+  // Get full post data with all multilingual fields (for edit)
+  async getPostFull(id: string): Promise<Post> {
+    // Try to get from list endpoint with filter to get full object
+    const response = await axiosInstance.get<ApiResponse<{ posts: Post[] }>>(
+      `${API_ENDPOINTS.POSTS.LIST}?_id=${id}`
+    );
+    const data = response.data.result || response.data.data;
+    if (data && (data as any).posts && (data as any).posts.length > 0) {
+      return (data as any).posts[0];
+    }
+    // Fallback to regular getPost
+    return this.getPost(id);
   }
 
   // Get post by slug
@@ -185,7 +199,7 @@ class ApiService {
       limit: limit.toString(),
       category: categorySlug,
     });
-    
+
     const response = await axiosInstance.get<ApiResponse<PostsResponse>>(`${API_ENDPOINTS.POSTS.LIST}?${params}`);
     const result = response.data.result || response.data.data;
     if (!result) {
@@ -250,17 +264,17 @@ class ApiService {
         'Content-Type': 'multipart/form-data',
       },
     });
-    
+
     const data = response.data.result || response.data.data;
     if (!data) {
       throw new Error('Invalid response: data is missing');
     }
-    
+
     // Construct URL if not provided by API
     if (!data.url && data.filename) {
       data.url = `/uploads/media/${data.filename}`;
     }
-    
+
     return data;
   }
 
